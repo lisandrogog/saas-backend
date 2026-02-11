@@ -1,0 +1,604 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model access_scope {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique @db.VarChar(30)
+  name        String       @db.VarChar(50)
+  description String?
+  item_order  Int          @default(0)
+  permission  permission[]
+}
+
+model app_module {
+  id             Int              @id @default(autoincrement())
+  platform_id    Int?
+  name           String?          @db.VarChar(100)
+  code           String?          @db.VarChar(50)
+  item_order     Int              @default(0)
+  platform       platform?        @relation(fields: [platform_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  app_sub_module app_sub_module[]
+  tenant_module  tenant_module[]
+
+  @@unique([platform_id, code])
+}
+
+model app_sub_module {
+  id            Int          @id @default(autoincrement())
+  app_module_id Int?
+  name          String?      @db.VarChar(100)
+  code          String?      @db.VarChar(50)
+  item_order    Int          @default(0)
+  app_module    app_module?  @relation(fields: [app_module_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  permission    permission[]
+
+  @@unique([app_module_id, code])
+}
+
+model app_user {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_partner_id    String                   @db.Uuid
+  role_id                String                   @db.Uuid
+  status_id              Int
+  username               String                   @db.VarChar(100)
+  password_hash          String
+  profile_data           Json?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  created_by             String?                  @db.Uuid
+  updated_at             DateTime?                @db.Timestamptz(6)
+  updated_by             String?                  @db.Uuid
+  removed_at             DateTime?                @db.Timestamptz(6)
+  removed_by             String?                  @db.Uuid
+  business_partner       business_partner         @relation(fields: [business_partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  role                   role                     @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  app_user_status        app_user_status          @relation(fields: [status_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  app_user_business_unit app_user_business_unit[]
+  auth_audit_log         auth_audit_log[]
+  refresh_token          refresh_token[]
+  user_session           user_session[]
+
+  @@unique([business_partner_id, removed_at], map: "uq_app_user_partner")
+  @@unique([username, removed_at], map: "uq_app_user_username")
+}
+
+model app_user_business_unit {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  app_user_id      String        @db.Uuid
+  business_unit_id String        @db.Uuid
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  created_by       String?       @db.Uuid
+  app_user         app_user      @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_unit    business_unit @relation(fields: [business_unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([app_user_id, business_unit_id])
+}
+
+model app_user_status {
+  id          Int        @id @default(autoincrement())
+  code        String     @unique @db.VarChar(20)
+  name        String     @db.VarChar(50)
+  description String?
+  item_order  Int        @default(0)
+  app_user    app_user[]
+}
+
+model auth_audit_log {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  app_user_id   String     @db.Uuid
+  identifier    String     @db.VarChar(255)
+  event_type_id Int
+  extra_data    Json?
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  app_user      app_user   @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event_type    event_type @relation(fields: [event_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model base_translation {
+  id                   String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code                 String                 @unique @db.VarChar(100)
+  default_value        String
+  industry_translation industry_translation[]
+  tenant_translation   tenant_translation[]
+}
+
+model business_partner {
+  id                                                          String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id                                                   String              @db.Uuid
+  identification_type_id                                      Int
+  identification_number                                       String              @db.VarChar(255)
+  first_name                                                  String?             @db.VarChar(100)
+  last_name                                                   String?             @db.VarChar(100)
+  email                                                       String?             @db.VarChar(255)
+  phone                                                       String?             @db.VarChar(50)
+  address                                                     String?
+  is_customer                                                 Boolean             @default(false)
+  is_agent                                                    Boolean             @default(false)
+  active                                                      Boolean             @default(true)
+  extra_data                                                  Json?
+  created_at                                                  DateTime            @default(now()) @db.Timestamptz(6)
+  created_by                                                  String?             @db.Uuid
+  updated_at                                                  DateTime?           @db.Timestamptz(6)
+  updated_by                                                  String?             @db.Uuid
+  removed_at                                                  DateTime?           @db.Timestamptz(6)
+  removed_by                                                  String?             @db.Uuid
+  app_user                                                    app_user[]
+  identification_type                                         identification_type @relation(fields: [identification_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                                                      tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_order_purchase_order_agent_idTobusiness_partner    purchase_order[]    @relation("purchase_order_agent_idTobusiness_partner")
+  purchase_order_purchase_order_customer_idTobusiness_partner purchase_order[]    @relation("purchase_order_customer_idTobusiness_partner")
+  sales_order_sales_order_agent_idTobusiness_partner          sales_order[]       @relation("sales_order_agent_idTobusiness_partner")
+  sales_order_sales_order_customer_idTobusiness_partner       sales_order[]       @relation("sales_order_customer_idTobusiness_partner")
+  service_order_service_order_agent_idTobusiness_partner      service_order[]     @relation("service_order_agent_idTobusiness_partner")
+  service_order_service_order_customer_idTobusiness_partner   service_order[]     @relation("service_order_customer_idTobusiness_partner")
+
+  @@unique([tenant_id, identification_number, identification_type_id, removed_at], map: "uq_business_partner")
+}
+
+model business_unit {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id              String                   @db.Uuid
+  code                   String                   @db.VarChar(50)
+  business_name          String                   @db.VarChar(255)
+  email                  String?                  @db.VarChar(255)
+  phone                  String?                  @db.VarChar(50)
+  address                String?
+  active                 Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  created_by             String?                  @db.Uuid
+  updated_at             DateTime?                @db.Timestamptz(6)
+  updated_by             String?                  @db.Uuid
+  removed_at             DateTime?                @db.Timestamptz(6)
+  removed_by             String?                  @db.Uuid
+  app_user_business_unit app_user_business_unit[]
+  tenant                 tenant                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_business_unit  product_business_unit[]
+  purchase_order         purchase_order[]
+  sales_order            sales_order[]
+  service_order          service_order[]
+
+  @@unique([tenant_id, code, removed_at], map: "uq_business_unit")
+}
+
+model document_action {
+  id                   Int                    @id @default(autoincrement())
+  code                 String                 @unique @db.VarChar(50)
+  name                 String                 @db.VarChar(100)
+  document_engine_item document_engine_item[]
+}
+
+model document_engine {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code                   String                   @db.VarChar(100)
+  name                   String                   @db.VarChar(250)
+  description            String?
+  document_type_id       Int
+  initial_state_id       Int
+  is_default             Boolean                  @default(false)
+  document_type          document_type            @relation(fields: [document_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status        document_status          @relation(fields: [initial_state_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_engine_item   document_engine_item[]
+  tenant_document_engine tenant_document_engine[]
+}
+
+model document_engine_item {
+  id                                                                  String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  document_engine_id                                                  String          @db.Uuid
+  from_state_id                                                       Int
+  to_state_id                                                         Int
+  allow_backwards                                                     Boolean         @default(false)
+  document_action_id                                                  Int
+  document_action                                                     document_action @relation(fields: [document_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_engine                                                     document_engine @relation(fields: [document_engine_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status_document_engine_item_from_state_idTodocument_status document_status @relation("document_engine_item_from_state_idTodocument_status", fields: [from_state_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status_document_engine_item_to_state_idTodocument_status   document_status @relation("document_engine_item_to_state_idTodocument_status", fields: [to_state_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([document_engine_id, from_state_id, to_state_id])
+}
+
+model document_status {
+  id                                                                       Int                    @id @default(autoincrement())
+  code                                                                     String                 @unique @db.VarChar(20)
+  name                                                                     String                 @db.VarChar(50)
+  is_editable                                                              Boolean                @default(false)
+  is_final                                                                 Boolean                @default(false)
+  is_posted                                                                Boolean                @default(false)
+  document_engine                                                          document_engine[]
+  document_engine_item_document_engine_item_from_state_idTodocument_status document_engine_item[] @relation("document_engine_item_from_state_idTodocument_status")
+  document_engine_item_document_engine_item_to_state_idTodocument_status   document_engine_item[] @relation("document_engine_item_to_state_idTodocument_status")
+  purchase_order                                                           purchase_order[]
+  sales_order                                                              sales_order[]
+  service_order                                                            service_order[]
+}
+
+model document_type {
+  id               Int               @id @default(autoincrement())
+  code             String            @unique @db.VarChar(20)
+  name             String            @db.VarChar(250)
+  movement_type_id Int
+  document_engine  document_engine[]
+  movement_type    movement_type     @relation(fields: [movement_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_order   purchase_order[]
+  sales_order      sales_order[]
+  service_order    service_order[]
+}
+
+model event_type {
+  id             Int              @id @default(autoincrement())
+  code           String           @unique @db.VarChar(30)
+  name           String           @db.VarChar(50)
+  auth_audit_log auth_audit_log[]
+}
+
+model identification_type {
+  id               Int                @id @default(autoincrement())
+  code             String             @unique @db.VarChar(20)
+  name             String             @db.VarChar(250)
+  business_partner business_partner[]
+  tenant           tenant[]
+}
+
+model industry {
+  id                   Int                    @id @default(autoincrement())
+  code                 String                 @unique @db.VarChar(20)
+  name                 String                 @db.VarChar(50)
+  industry_translation industry_translation[]
+  tenant               tenant[]
+}
+
+model industry_translation {
+  id                  String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  industry_id         Int
+  base_translation_id String           @db.Uuid
+  custom_value        String
+  base_translation    base_translation @relation(fields: [base_translation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  industry            industry         @relation(fields: [industry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([industry_id, base_translation_id])
+}
+
+model movement_type {
+  id            Int             @id @default(autoincrement())
+  code          String          @unique @db.VarChar(20)
+  name          String          @db.VarChar(250)
+  sign          Int             @db.SmallInt
+  document_type document_type[]
+}
+
+model permission {
+  id                 String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  role_id            String          @db.Uuid
+  app_sub_module_id  Int
+  access_scope_id    Int
+  permission_type_id Int
+  readonly           Boolean         @default(false)
+  item_order         Int             @default(0)
+  created_at         DateTime        @default(now()) @db.Timestamptz(6)
+  created_by         String?         @db.Uuid
+  updated_at         DateTime?       @db.Timestamptz(6)
+  updated_by         String?         @db.Uuid
+  removed_at         DateTime?       @db.Timestamptz(6)
+  removed_by         String?         @db.Uuid
+  access_scope       access_scope    @relation(fields: [access_scope_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  app_sub_module     app_sub_module  @relation(fields: [app_sub_module_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  permission_type    permission_type @relation(fields: [permission_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  role               role            @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([role_id, app_sub_module_id, access_scope_id, removed_at], map: "uq_permission")
+}
+
+model permission_type {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(50)
+  code        String       @unique @db.VarChar(20)
+  description String?
+  item_order  Int          @default(0)
+  permission  permission[]
+}
+
+model platform {
+  id         Int          @id @default(autoincrement())
+  name       String?      @db.VarChar(100)
+  code       String?      @unique @db.VarChar(50)
+  app_module app_module[]
+}
+
+model product {
+  id                    String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id             String                  @db.Uuid
+  product_category_id   String                  @db.Uuid
+  code                  String                  @db.VarChar(100)
+  name                  String                  @db.VarChar(255)
+  base_price            Decimal                 @default(0) @db.Decimal(15, 2)
+  base_cost             Decimal                 @default(0) @db.Decimal(15, 2)
+  active                Boolean                 @default(true)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  created_by            String?                 @db.Uuid
+  updated_at            DateTime?               @db.Timestamptz(6)
+  updated_by            String?                 @db.Uuid
+  removed_at            DateTime?               @db.Timestamptz(6)
+  removed_by            String?                 @db.Uuid
+  product_category      product_category        @relation(fields: [product_category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_business_unit product_business_unit[]
+  purchase_order_item   purchase_order_item[]
+  sales_order_item      sales_order_item[]
+  service_order_item    service_order_item[]
+
+  @@unique([tenant_id, code, removed_at], map: "uq_product")
+}
+
+model product_business_unit {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id       String        @db.Uuid
+  business_unit_id String        @db.Uuid
+  price            Decimal       @default(0) @db.Decimal(15, 2)
+  cost             Decimal       @default(0) @db.Decimal(15, 2)
+  stock            Decimal       @default(0) @db.Decimal(15, 3)
+  active           Boolean       @default(true)
+  extra_data       Json?
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  business_unit    business_unit @relation(fields: [business_unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product          product       @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([product_id, business_unit_id])
+}
+
+model product_category {
+  id                       String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id                String                @db.Uuid
+  code                     String                @db.VarChar(50)
+  name                     String                @db.VarChar(100)
+  active                   Boolean               @default(true)
+  created_at               DateTime              @default(now()) @db.Timestamptz(6)
+  created_by               String?               @db.Uuid
+  updated_at               DateTime?             @db.Timestamptz(6)
+  updated_by               String?               @db.Uuid
+  removed_at               DateTime?             @db.Timestamptz(6)
+  removed_by               String?               @db.Uuid
+  product_category_type_id Int
+  product                  product[]
+  product_category_type    product_category_type @relation(fields: [product_category_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                   tenant                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, code, removed_at], map: "uq_product_category")
+}
+
+model refresh_token {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  app_user_id String    @db.Uuid
+  token       String    @unique
+  expires_at  DateTime  @db.Timestamptz(6)
+  revoked_at  DateTime? @db.Timestamptz(6)
+  app_user    app_user  @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model role {
+  id          String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id   String       @db.Uuid
+  code        String       @db.VarChar(50)
+  name        String       @db.VarChar(100)
+  description String?
+  readonly    Boolean      @default(false)
+  item_order  Int          @default(0)
+  created_at  DateTime     @default(now()) @db.Timestamptz(6)
+  created_by  String?      @db.Uuid
+  updated_at  DateTime?    @db.Timestamptz(6)
+  updated_by  String?      @db.Uuid
+  removed_at  DateTime?    @db.Timestamptz(6)
+  removed_by  String?      @db.Uuid
+  app_user    app_user[]
+  permission  permission[]
+  tenant      tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, code, removed_at], map: "uq_role")
+}
+
+model sales_order {
+  id                                                         String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id                                                  String             @db.Uuid
+  business_unit_id                                           String             @db.Uuid
+  customer_id                                                String             @db.Uuid
+  agent_id                                                   String             @db.Uuid
+  document_status_id                                         Int
+  total_amount                                               Decimal            @default(0) @db.Decimal(15, 2)
+  scheduled_at                                               DateTime?          @db.Timestamptz(6)
+  is_posted                                                  Boolean            @default(false)
+  is_printed                                                 Boolean            @default(false)
+  extra_data                                                 Json?
+  created_at                                                 DateTime           @default(now()) @db.Timestamptz(6)
+  created_by                                                 String?            @db.Uuid
+  updated_at                                                 DateTime?          @db.Timestamptz(6)
+  updated_by                                                 String?            @db.Uuid
+  removed_at                                                 DateTime?          @db.Timestamptz(6)
+  removed_by                                                 String?            @db.Uuid
+  document_type_id                                           Int
+  business_partner_sales_order_agent_idTobusiness_partner    business_partner   @relation("sales_order_agent_idTobusiness_partner", fields: [agent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_unit                                              business_unit      @relation(fields: [business_unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_partner_sales_order_customer_idTobusiness_partner business_partner   @relation("sales_order_customer_idTobusiness_partner", fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status                                            document_status    @relation(fields: [document_status_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_type                                              document_type      @relation(fields: [document_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                                                     tenant             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_order_item                                           sales_order_item[]
+}
+
+model sales_order_item {
+  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sales_order_id String      @db.Uuid
+  product_id     String      @db.Uuid
+  quantity       Decimal     @db.Decimal(15, 3)
+  unit_price     Decimal     @db.Decimal(15, 2)
+  product        product     @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_order    sales_order @relation(fields: [sales_order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([sales_order_id, product_id])
+}
+
+model service_order {
+  id                                                           String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id                                                    String               @db.Uuid
+  business_unit_id                                             String               @db.Uuid
+  customer_id                                                  String               @db.Uuid
+  agent_id                                                     String               @db.Uuid
+  document_status_id                                           Int
+  total_amount                                                 Decimal              @default(0) @db.Decimal(15, 2)
+  scheduled_at                                                 DateTime?            @db.Timestamptz(6)
+  is_posted                                                    Boolean              @default(false)
+  is_printed                                                   Boolean              @default(false)
+  extra_data                                                   Json?
+  created_at                                                   DateTime             @default(now()) @db.Timestamptz(6)
+  created_by                                                   String?              @db.Uuid
+  updated_at                                                   DateTime?            @db.Timestamptz(6)
+  updated_by                                                   String?              @db.Uuid
+  removed_at                                                   DateTime?            @db.Timestamptz(6)
+  removed_by                                                   String?              @db.Uuid
+  document_type_id                                             Int
+  business_partner_service_order_agent_idTobusiness_partner    business_partner     @relation("service_order_agent_idTobusiness_partner", fields: [agent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_unit                                                business_unit        @relation(fields: [business_unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_partner_service_order_customer_idTobusiness_partner business_partner     @relation("service_order_customer_idTobusiness_partner", fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status                                              document_status      @relation(fields: [document_status_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_type                                                document_type        @relation(fields: [document_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                                                       tenant               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service_order_item                                           service_order_item[]
+}
+
+model service_order_item {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  service_order_id String        @db.Uuid
+  product_id       String        @db.Uuid
+  quantity         Decimal       @db.Decimal(15, 3)
+  unit_price       Decimal       @db.Decimal(15, 2)
+  product          product       @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service_order    service_order @relation(fields: [service_order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([service_order_id, product_id])
+}
+
+model tenant {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  identification_type_id Int
+  identification_number  String                   @db.VarChar(255)
+  code                   String                   @unique @db.VarChar(50)
+  business_name          String                   @db.VarChar(255)
+  email                  String?                  @db.VarChar(255)
+  phone                  String?                  @db.VarChar(50)
+  industry_id            Int?
+  active                 Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  created_by             String?                  @db.Uuid
+  updated_at             DateTime?                @db.Timestamptz(6)
+  updated_by             String?                  @db.Uuid
+  business_partner       business_partner[]
+  business_unit          business_unit[]
+  product                product[]
+  product_category       product_category[]
+  purchase_order         purchase_order[]
+  role                   role[]
+  sales_order            sales_order[]
+  service_order          service_order[]
+  identification_type    identification_type      @relation(fields: [identification_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  industry               industry?                @relation(fields: [industry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant_document_engine tenant_document_engine[]
+  tenant_module          tenant_module[]
+  tenant_translation     tenant_translation[]
+
+  @@unique([identification_number, identification_type_id])
+}
+
+model tenant_document_engine {
+  id                 String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id          String          @db.Uuid
+  document_engine_id String          @db.Uuid
+  created_at         DateTime        @default(now()) @db.Timestamptz(6)
+  document_engine    document_engine @relation(fields: [document_engine_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant             tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, document_engine_id])
+}
+
+model tenant_module {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id     String     @db.Uuid
+  app_module_id Int
+  active        Boolean    @default(true)
+  expires_at    DateTime?  @db.Timestamptz(6)
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?  @db.Timestamptz(6)
+  app_module    app_module @relation(fields: [app_module_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant        tenant     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, app_module_id])
+}
+
+model tenant_translation {
+  id                  String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id           String           @db.Uuid
+  base_translation_id String           @db.Uuid
+  custom_value        String
+  base_translation    base_translation @relation(fields: [base_translation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant              tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, base_translation_id])
+}
+
+model user_session {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  app_user_id    String   @db.Uuid
+  ip_address     String?  @db.VarChar(45)
+  user_agent     String?
+  last_active_at DateTime @default(now()) @db.Timestamptz(6)
+  active         Boolean? @default(true)
+  app_user       app_user @relation(fields: [app_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model purchase_order {
+  id                                                            String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenant_id                                                     String                @db.Uuid
+  business_unit_id                                              String                @db.Uuid
+  customer_id                                                   String                @db.Uuid
+  agent_id                                                      String                @db.Uuid
+  document_status_id                                            Int
+  total_amount                                                  Decimal               @default(0) @db.Decimal(15, 2)
+  scheduled_at                                                  DateTime?             @db.Timestamptz(6)
+  is_posted                                                     Boolean               @default(false)
+  is_printed                                                    Boolean               @default(false)
+  extra_data                                                    Json?
+  created_at                                                    DateTime              @default(now()) @db.Timestamptz(6)
+  created_by                                                    String?               @db.Uuid
+  updated_at                                                    DateTime?             @db.Timestamptz(6)
+  updated_by                                                    String?               @db.Uuid
+  removed_at                                                    DateTime?             @db.Timestamptz(6)
+  removed_by                                                    String?               @db.Uuid
+  document_type_id                                              Int
+  business_partner_purchase_order_agent_idTobusiness_partner    business_partner      @relation("purchase_order_agent_idTobusiness_partner", fields: [agent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_unit                                                 business_unit         @relation(fields: [business_unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  business_partner_purchase_order_customer_idTobusiness_partner business_partner      @relation("purchase_order_customer_idTobusiness_partner", fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_status                                               document_status       @relation(fields: [document_status_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  document_type                                                 document_type         @relation(fields: [document_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant                                                        tenant                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_order_item                                           purchase_order_item[]
+}
+
+model purchase_order_item {
+  id                String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  purchase_order_id String         @db.Uuid
+  product_id        String         @db.Uuid
+  quantity          Decimal        @db.Decimal(15, 3)
+  unit_price        Decimal        @db.Decimal(15, 2)
+  product           product        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_order    purchase_order @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([purchase_order_id, product_id])
+}
+
+model product_category_type {
+  id               Int                @id @default(autoincrement())
+  code             String             @unique @db.VarChar(20)
+  name             String             @db.VarChar(50)
+  product_category product_category[]
+}
